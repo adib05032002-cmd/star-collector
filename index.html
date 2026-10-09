@@ -1,63 +1,183 @@
-```html
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لعبة جمع النجوم</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background: #152238;
-            color: white;
-            margin: 0;
-            padding: 20px;
-        }
-        h1 {
-            color: #ffdf5d;
-        }
-        #game {
-            max-width: 500px;
-            margin: 20px auto;
-            padding: 20px;
-            background: #263b59;
-            border-radius: 15px;
-        }
-        #star {
-            font-size: 65px;
-            cursor: pointer;
-            margin: 25px;
-        }
-        button {
-            font-size: 20px;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 10px;
-            background: #ffdf5d;
-            cursor: pointer;
-        }
-        #score {
-            color: #ffdf5d;
-            font-size: 28px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لعبة جمع النجوم ⭐</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    color: white;
+    background: #101735;
+  }
+  h1 { color: #ffdf5d; margin: 18px 0 8px; }
+  #score { font-size: 23px; margin: 12px; }
+  #game {
+    display: block;
+    width: min(94vw, 500px);
+    height: 480px;
+    max-height: 65vh;
+    margin: 0 auto;
+    border: 3px solid #748bff;
+    border-radius: 16px;
+    background: linear-gradient(#182454, #453d83);
+    touch-action: none;
+  }
+  button {
+    border: 0;
+    border-radius: 12px;
+    padding: 12px 22px;
+    margin: 10px 5px;
+    font-size: 18px;
+    font-weight: bold;
+    background: #ffdf5d;
+    color: #24203d;
+    cursor: pointer;
+  }
+  p { padding: 0 12px; }
+</style>
 </head>
 <body>
-    <h1>⭐ لعبة جمع النجوم ⭐</h1>
-    <div id="game">
-        <p>اضغط على النجمة واجمع أكبر عدد ممكن!</p>
-        <p>النقاط: <span id="score">0</span></p>
-        <div id="star" onclick="collectStar()">⭐</div>
-        <button onclick="collectStar()">اجمع نجمة!</button>
-    </div>
-    <script>
-        let score = 0;
-        function collectStar() {
-            score++;
-            document.getElementById("score").textContent = score;
-        }
-    </script>
+<h1>⭐ مغامرة جمع النجوم ⭐</h1>
+<div id="score">النقاط: 0</div>
+<canvas id="game" width="500" height="480"></canvas>
+<p>حرّكي السلة بالأسهم ← → أو بإصبعك داخل اللعبة!</p>
+<button id="start">ابدئي اللعب 🎮</button>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const scoreText = document.getElementById("score");
+const startBtn = document.getElementById("start");
+
+let score = 0;
+let stars = [];
+let running = false;
+let player = { x: 220, y: 425, w: 70, h: 24 };
+let keys = {};
+let lastTime = 0;
+let spawnTimer = 0;
+
+function newStar() {
+  stars.push({
+    x: 18 + Math.random() * (canvas.width - 36),
+    y: -20,
+    size: 12 + Math.random() * 9,
+    speed: 100 + Math.random() * 100
+  });
+}
+
+function drawStar(x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = "#ffdf5d";
+  ctx.shadowColor = "#fff0a0";
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5;
+    const radius = i % 2 === 0 ? r : r * 0.45;
+    ctx.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // نجوم صغيرة في السماء
+  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  for (let i = 0; i < 35; i++) {
+    const x = (i * 83 + 19) % canvas.width;
+    const y = (i * 47 + 13) % canvas.height;
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  stars.forEach(s => drawStar(s.x, s.y, s.size));
+
+  // السلة
+  ctx.font = "58px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("🧺", player.x + player.w / 2, player.y + 17);
+}
+
+function loop(time) {
+  if (!running) return;
+
+  const dt = Math.min((time - lastTime) / 1000 || 0, 0.04);
+  lastTime = time;
+
+  if (keys.ArrowLeft) player.x -= 260 * dt;
+  if (keys.ArrowRight) player.x += 260 * dt;
+
+  player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
+
+  spawnTimer += dt;
+  if (spawnTimer > 0.75) {
+    newStar();
+    spawnTimer = 0;
+  }
+
+  stars.forEach(s => {
+    s.y += s.speed * dt;
+
+    if (
+      s.y + s.size >= player.y &&
+      s.y - s.size <= player.y + player.h &&
+      s.x >= player.x - 5 &&
+      s.x <= player.x + player.w + 5
+    ) {
+      s.caught = true;
+      score++;
+      scoreText.textContent = "النقاط: " + score;
+    }
+  });
+
+  stars = stars.filter(s => !s.caught && s.y < canvas.height + 30);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function moveBasket(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scale = canvas.width / rect.width;
+  player.x = (e.clientX - rect.left) * scale - player.w / 2;
+  player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
+}
+
+canvas.addEventListener("pointerdown", moveBasket);
+canvas.addEventListener("pointermove", e => {
+  if (e.buttons || e.pointerType === "touch") moveBasket(e);
+});
+
+document.addEventListener("keydown", e => {
+  if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
+    keys[e.key] = true;
+    e.preventDefault();
+  }
+});
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+startBtn.addEventListener("click", () => {
+  score = 0;
+  stars = [];
+  player.x = 215;
+  spawnTimer = 0;
+  lastTime = 0;
+  scoreText.textContent = "النقاط: 0";
+  running = true;
+  startBtn.textContent = "إعادة اللعب 🔄";
+  draw();
+  requestAnimationFrame(loop);
+});
+
+draw();
+</script>
 </body>
 </html>
-```
